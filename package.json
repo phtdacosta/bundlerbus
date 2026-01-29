@@ -6,8 +6,7 @@
   "scripts": {
     "dev": "bun app.js",
     "bundle:natives": "bun run build-native-bundle.js",
-    "build": "bun run build.js",
-    "test:exe": "dist/app-test.exe"
+    "build": "bun run build.js"
   },
   "dependencies": {
     "argon2": "^0.44.0",
