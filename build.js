@@ -13,11 +13,9 @@ async function build() {
         const target = process.platform === 'win32' ? 'bun-windows-x64' : 'bun-linux-x64';
         const outfile = process.platform === 'win32' ? './dist/app-test.exe' : './dist/app-test';
 
-        // Notice: NO --external flags needed anymore.
-        // Bun only compiles the bootstrap code.
         const cmd = `bun build --compile --target=${target} bootstrap.js --outfile=${outfile}`;
 
-        console.log(`[BUILD] Creating binary...`);
+        console.log(`[BUILD] Compiling loader binary...`);
         await execAsync(cmd);
         console.log(`\n[SUCCESS] Build successful: ${outfile}`);
     } catch (err) {

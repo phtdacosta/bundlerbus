@@ -1,9 +1,10 @@
-import { existsSync, mkdirSync, writeFileSync, readdirSync, readFileSync, createWriteStream } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, readdirSync, readFileSync, createWriteStream, rmSync } from 'fs';
 import { join, dirname, extname } from 'path';
 import { homedir } from 'os';
 import { createGunzip } from 'zlib';
 import { Readable } from 'stream';
 import tar from 'tar-stream';
+import { createHash } from 'crypto';
 
 // The embedded archive
 import payloadArchive from './payload.tar.gz' with { type: 'file' };
@@ -22,12 +23,18 @@ function getCacheDir() {
 async function bootstrap() {
     try {
         const cacheDir = getCacheDir();
-        const marker = join(cacheDir, '.extracted');
+        const payloadBuffer = readFileSync(payloadArchive);
 
-        // 1. Extraction Logic
-        if (!existsSync(marker)) {
-            console.log(`[BOOTSTRAP] Initializing runtime environment...`);
-            if (!existsSync(cacheDir)) mkdirSync(cacheDir, { recursive: true });
+        // 1. Calculate Hash of the embedded archive
+        const currentHash = createHash('md5').update(payloadBuffer).digest('hex');
+        const hashFile = join(cacheDir, '.hash');
+        const existingHash = existsSync(hashFile) ? readFileSync(hashFile, 'utf8') : null;
+
+        // 2. Extract if hash doesn't match or doesn't exist
+        if (currentHash !== existingHash) {
+            console.log(`[BOOTSTRAP] Updating/Initializing runtime (Hash: ${currentHash.slice(0,8)})...`);
+            if (existsSync(cacheDir)) rmSync(cacheDir, { recursive: true, force: true });
+            mkdirSync(cacheDir, { recursive: true });
 
             await new Promise((resolve, reject) => {
                 const extract = tar.extract();
@@ -42,15 +49,16 @@ async function bootstrap() {
                     }
                 });
                 extract.on('finish', resolve);
-                Readable.from(readFileSync(payloadArchive)).pipe(createGunzip()).pipe(extract);
+                Readable.from(payloadBuffer).pipe(createGunzip()).pipe(extract);
             });
-            writeFileSync(marker, new Date().toISOString());
+            writeFileSync(hashFile, currentHash);
         }
 
-        // 2. Setup Native Paths
+        // 3. Setup Native Paths (Recursive Scan)
         const nodeModules = join(cacheDir, 'node_modules');
         const libPaths = new Set();
         const scan = (dir) => {
+            if (!existsSync(dir)) return;
             const entries = readdirSync(dir, { withFileTypes: true });
             for (const e of entries) {
                 const p = join(dir, e.name);
@@ -58,17 +66,15 @@ async function bootstrap() {
                 else if (['.dll', '.so', '.node', '.dylib'].includes(extname(e.name).toLowerCase())) libPaths.add(dir);
             }
         };
-        if (existsSync(nodeModules)) scan(nodeModules);
+        scan(nodeModules);
 
         const envVar = process.platform === 'win32' ? 'PATH' : (process.platform === 'darwin' ? 'DYLD_LIBRARY_PATH' : 'LD_LIBRARY_PATH');
         const sep = process.platform === 'win32' ? ';' : ':';
         process.env[envVar] = Array.from(libPaths).join(sep) + sep + (process.env[envVar] || '');
 
-        // 3. Launch from Disk
+        // 4. Launch Application
         const entryPoint = join(cacheDir, 'app.js');
-        console.log('[BOOTSTRAP] Launching payload...');
-
-        // Using dynamic import on the absolute physical path
+        console.log('[BOOTSTRAP] System ready. Launching payload...');
         await import(entryPoint);
 
     } catch (err) {

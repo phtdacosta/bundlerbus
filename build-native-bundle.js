@@ -4,7 +4,7 @@ import tar from 'tar-stream';
 import { join } from 'path';
 
 async function bundle() {
-    console.log('[BUILDER] 🔍 Packing everything into archive...');
+    console.log('[BUILDER] Packing app logic and dependencies...');
     const pack = tar.pack();
     const gzip = createGzip();
     const output = createWriteStream('payload.tar.gz');
