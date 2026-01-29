@@ -1,0 +1,68 @@
+# =========================
+# Node.js / Bun
+# =========================
+
+# Dependencies
+node_modules/
+bun_modules/
+
+# Bun
+.bun/
+bun.lockb
+bun.lock
+
+# npm / pnpm / yarn
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Runtime data
+pids/
+*.pid
+*.pid.lock
+
+# Coverage / test output
+coverage/
+.nyc_output/
+
+# Build output
+dist/
+build/
+out/
+
+# Cache
+.cache/
+.tmp/
+.temp/
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# =========================
+# IDE / OS junk
+# =========================
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# =========================
+# Ignore folders starting with "_"
+# =========================
+_*/
+**/_*/
+
+# External bundle
+payload.tar.gz
+# Test output
+output.png
