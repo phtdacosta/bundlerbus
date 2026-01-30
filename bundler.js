@@ -3,8 +3,9 @@ import { createWriteStream, existsSync, readdirSync, statSync, lstatSync, readFi
 import { createGzip } from 'zlib';
 import tar from 'tar-stream';
 import { join, resolve, relative } from 'path';
+import { minimatch } from 'minimatch';
 
-// Standard files npm always includes
+// Standard files npm always includes implicitly
 const NPM_STANDARD_FILES = [
     'package.json',
     'README.md',
@@ -14,8 +15,7 @@ const NPM_STANDARD_FILES = [
     'NOTICE'
 ];
 
-// Directories/files to always exclude
-// REMOVED 'node_modules' from here because we manually handle it!
+// Directories/files to always exclude from the scan
 const ALWAYS_EXCLUDE = [
     '.git',
     '.github',
@@ -27,7 +27,9 @@ const ALWAYS_EXCLUDE = [
     'Thumbs.db',
     '*.log',
     '.env',
-    '.env.local'
+    '.env.local',
+    'payload.tar.gz',
+    'bootstrap.js'
 ];
 
 export async function createPayload(packageJson, entryPoint) {
@@ -40,143 +42,128 @@ export async function createPayload(packageJson, entryPoint) {
     pack.pipe(gzip).pipe(output);
 
     const processedPaths = new Set();
+    const root = process.cwd();
 
-    function shouldExclude(path) {
+    // Prepare Whitelist Patterns
+    const hasFilesField = packageJson.files && Array.isArray(packageJson.files);
+    const patterns = hasFilesField ? packageJson.files : ['**/*'];
+
+    /**
+     * Checks if a relative path matches the package.json "files" whitelist
+     */
+    function isWhitelisted(relPath) {
+        const normalizedRel = relPath.replace(/\\/g, '/');
+
+        return patterns.some(pattern => {
+            // 1. Glob match (e.g., "src/**/*.js")
+            if (minimatch(normalizedRel, pattern)) return true;
+
+            // 2. Directory prefix match (e.g., pattern "src" matches "src/app.js")
+            const dirPrefix = pattern.endsWith('/') ? pattern : `${pattern}/`;
+            if (normalizedRel.startsWith(dirPrefix)) return true;
+
+            return false;
+        });
+    }
+
+    /**
+     * Global exclusion filter
+     */
+    function isGlobalExcluded(path) {
         const baseName = path.split(/[\\/]/).pop().toLowerCase();
-
-        // Check ALWAYS_EXCLUDE patterns
         for (const pattern of ALWAYS_EXCLUDE) {
             if (pattern.startsWith('*')) {
-                // Wildcard pattern
                 const ext = pattern.substring(1);
                 if (baseName.endsWith(ext)) return true;
             } else if (baseName === pattern || path.includes(`/${pattern}/`) || path.includes(`\\${pattern}\\`)) {
                 return true;
             }
         }
-
         return false;
     }
 
     function addEntry(localPath, archivePath) {
-      if (!existsSync(localPath)) {
-          // Only warn if it's not a known excluded file
-          if (!shouldExclude(localPath)) {
-              console.warn(`[BUNDLER] Warning: Path not found: ${localPath}`);
-          }
-          return;
-      }
+        if (!existsSync(localPath)) return;
 
-      // 1. Resolve absolute path to detect duplicates/circular refs
-      const normalized = resolve(localPath);
-      if (processedPaths.has(normalized)) return;
-      processedPaths.add(normalized);
+        // 1. Prevent duplicate packing and circular refs
+        const normalized = resolve(localPath);
+        if (processedPaths.has(normalized)) return;
+        processedPaths.add(normalized);
 
-      // 2. DETECT SYMLINKS (Crucial for 'bun link' and preventing infinite loops)
-      const lstats = lstatSync(localPath);
-      if (lstats.isSymbolicLink()) {
-          // We skip symlinks in the bundle to avoid circular recursion.
-          // When the app is extracted, it will use real files.
-          return;
-      }
+        // 2. Symlink protection (Fixes infinite loops in 'bun link')
+        const lstats = lstatSync(localPath);
+        if (lstats.isSymbolicLink()) return;
 
-      // 3. Check global exclusions (dist, .git, etc.)
-      // We bypass exclusion check ONLY for the top-level node_modules folder itself
-      if (shouldExclude(localPath) && !localPath.endsWith('node_modules')) {
-          return;
-      }
+        // 3. Skip global junk
+        if (isGlobalExcluded(localPath) && !localPath.endsWith('node_modules')) {
+            return;
+        }
 
-      const stats = statSync(localPath);
+        const relPath = relative(root, localPath);
+        const stats = statSync(localPath);
+        const isDirectory = stats.isDirectory();
+        const isNodeModules = localPath.includes('node_modules');
 
-      if (stats.isDirectory()) {
-          try {
-              const items = readdirSync(localPath);
-              for (const item of items) {
-                  // Use recursive calls for children
-                  addEntry(join(localPath, item), join(archivePath, item));
-              }
-          } catch (err) {
-              console.warn(`[BUNDLER] Could not read directory ${localPath}: ${err.message}`);
-          }
-      } else {
-          // 4. FILE OPTIMIZATION
-          const ext = localPath.split('.').pop().toLowerCase();
+        // 4. Whitelist Enforcement
+        // Directories are always entered to find files, but files must be whitelisted
+        if (!isNodeModules && !isDirectory && !isWhitelisted(relPath)) {
+            const baseName = relPath.split(/[\\/]/).pop();
+            const isImplicit = NPM_STANDARD_FILES.includes(baseName) || relPath === 'package.json';
+            if (!isImplicit) return;
+        }
 
-          // Skip heavy development junk in node_modules to keep EXE size down
-          if (localPath.includes('node_modules')) {
-              const isJunk = ['map', 'ts', 'tsx', 'h', 'cpp', 'c', 'cc', 'md', 'txt'].includes(ext);
-              if (isJunk) return;
-          }
-
-          // 5. PACK THE FILE
-          try {
-              const content = readFileSync(localPath);
-              // Use forward slashes for the TAR archive (internal standard)
-              const tarPath = archivePath.replace(/\\/g, '/');
-              pack.entry({ name: tarPath, mode: stats.mode }, content);
-          } catch (err) {
-              console.warn(`[BUNDLER] Failed to pack file ${localPath}: ${err.message}`);
-          }
-      }
-    }
-
-    // 1. Pack files based on package.json "files" field
-    if (packageJson.files && Array.isArray(packageJson.files)) {
-        console.log('[BUNDLER] Packing from "files" field...');
-        for (const pattern of packageJson.files) {
-            if (existsSync(pattern)) {
-                const stats = statSync(pattern);
-                if (stats.isDirectory()) {
-                    const cleanPattern = pattern.replace(/\/$/, '');
-                    addEntry(`./${cleanPattern}`, cleanPattern);
-                } else {
-                    addEntry(pattern, pattern);
+        if (isDirectory) {
+            try {
+                const items = readdirSync(localPath);
+                for (const item of items) {
+                    addEntry(join(localPath, item), join(archivePath, item));
                 }
+            } catch (err) {
+                console.warn(`[BUNDLER] Could not read directory ${localPath}: ${err.message}`);
+            }
+        } else {
+            // 5. File Packing & Optimization
+            const ext = localPath.split('.').pop().toLowerCase();
+
+            // Slim down node_modules by skipping heavy source/map files
+            if (isNodeModules) {
+                const isJunk = ['map', 'ts', 'tsx', 'h', 'cpp', 'c', 'cc', 'md', 'txt'].includes(ext);
+                if (isJunk) return;
+            }
+
+            try {
+                const content = readFileSync(localPath);
+                // Ensure TAR internal paths always use forward slashes for cross-platform extraction
+                const tarPath = archivePath.replace(/\\/g, '/');
+                pack.entry({ name: tarPath, mode: stats.mode }, content);
+            } catch (err) {
+                console.warn(`[BUNDLER] Failed to pack file ${localPath}: ${err.message}`);
             }
         }
-    } else {
-        // Fallback: Pack the directory containing the entry point
-        const entryDir = entryPoint.includes('/')
-            ? entryPoint.substring(0, entryPoint.lastIndexOf('/'))
-            : '.';
-
-        console.log(`[BUNDLER] Warning: No "files" field in package.json, packing ${entryDir}`);
-
-        if (entryDir === '.') {
-            // Entry is at root, pack everything...
-            readdirSync('.').forEach(item => {
-                // ...EXCEPT node_modules, which we handle specifically in Step 3
-                if (item === 'node_modules') return;
-                addEntry(item, item);
-            });
-        } else {
-            addEntry(`./${entryDir}`, entryDir);
-        }
     }
 
-    // 2. Always pack npm standard files
-    for (const file of NPM_STANDARD_FILES) {
-        if (existsSync(file) && !processedPaths.has(resolve(file))) {
-            addEntry(file, file);
-        }
+    // PHASE 1: Scan Project Root (Filters via Whitelist)
+    const rootEntries = readdirSync('.');
+    for (const item of rootEntries) {
+        if (item === 'node_modules' || item === 'dist') continue;
+        addEntry(item, item);
     }
 
-    // 3. Always pack node_modules (This works now because it's removed from ALWAYS_EXCLUDE)
+    // PHASE 2: Pack node_modules (Implicitly required for native bindings)
     console.log('[BUNDLER] Packing node_modules...');
     addEntry('./node_modules', 'node_modules');
 
     pack.finalize();
 
-    await new Promise(r => output.on('finish', r));
+    await new Promise((resolve, reject) => {
+        output.on('finish', resolve);
+        output.on('error', reject);
+    });
 
     console.log('[BUNDLER] Payload created: payload.tar.gz');
 }
 
 export function cleanupPayload() {
-    if (existsSync('payload.tar.gz')) {
-        rmSync('payload.tar.gz');
-    }
-    if (existsSync('bootstrap.js')) {
-        rmSync('bootstrap.js');
-    }
+    if (existsSync('payload.tar.gz')) rmSync('payload.tar.gz');
+    if (existsSync('bootstrap.js')) rmSync('bootstrap.js');
 }
