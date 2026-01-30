@@ -28,16 +28,20 @@
     "single-executable",
     "packaging"
   ],
-  "author": "Your Name",
+  "author": "Pedro Costa <pedrohenriqueteodorodacosta@gmail.com>",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/bundlerbus.git"
+    "url": "https://github.com/phtdacosta/bundlerbus.git"
   },
   "engines": {
     "node": ">=18.0.0",
     "bun": ">=1.0.0"
   },
+  "bugs": {
+    "url": "https://github.com/phtdacosta/bundlerbus/issues"
+  },
+  "homepage": "https://github.com/phtdacosta/bundlerbus#readme",
   "dependencies": {
     "minimatch": "^10.1.1",
     "tar-stream": "^3.1.7"

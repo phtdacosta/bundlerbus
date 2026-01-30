@@ -2,7 +2,9 @@
 
 **Universal native bindings bundler for Bun's `--compile` flag**
 
-Bundlerbus solves the critical problem of compiling Bun projects that use native Node.js modules (like Sharp, Canvas, better-sqlite3, serialport, etc.) into single-file executables. Bun's built-in `--compile` flag fails when these libraries try to load `.node` bindings from the virtual filesystem.
+Bundlerbus solves the critical problem of compiling Bun projects that use native Node.js modules (like Sharp, Canvas, serialport, etc.) into single-file executables. Bun's built-in `--compile` flag fails when these libraries try to load `.node` bindings from the virtual filesystem.
+
+The only exception is better-sqlite3 that still didn't work.
 
 ## The Problem
 
