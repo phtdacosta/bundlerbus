@@ -66,3 +66,6 @@ _*/
 payload.tar.gz
 # Test output
 output.png
+
+# Misc notes
+.*.md

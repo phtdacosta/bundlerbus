@@ -1,19 +1,47 @@
 {
   "name": "bundlerbus",
-  "version": "0.0.1",
-  "description": "Native bindings bundled into single executable test",
+  "version": "1.0.0",
+  "description": "Universal native bindings bundler for Bun's --compile flag",
   "type": "module",
+  "bin": {
+    "bundlerbus": "./cli.js"
+  },
+  "main": "./cli.js",
+  "files": [
+    "cli.js",
+    "bundler.js",
+    "bootstrap.template.js"
+  ],
   "scripts": {
-    "dev": "bun app.js",
-    "bundle:natives": "bun run build-native-bundle.js",
-    "build": "bun run build.js"
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "bun",
+    "compile",
+    "native",
+    "bindings",
+    "bundler",
+    "sharp",
+    "sqlite",
+    "canvas",
+    "serialport",
+    "single-executable",
+    "packaging"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/bundlerbus.git"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "bun": ">=1.0.0"
   },
   "dependencies": {
-    "argon2": "^0.44.0",
-    "bcrypt": "^6.0.0",
-    "canvas": "^3.2.1",
-    "serialport": "^13.0.0",
-    "sharp": "^0.33.0",
+    "minimatch": "^10.1.1",
     "tar-stream": "^3.1.7"
-  }
+  },
+  "peerDependencies": {},
+  "devDependencies": {}
 }

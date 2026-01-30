@@ -1,0 +1,30 @@
+{
+  "name": "bundlerbus-example",
+  "version": "1.0.0",
+  "description": "Example application demonstrating Bundlerbus with Sharp",
+  "type": "module",
+  "main": "./app.js",
+  "files": [
+    "app.js"
+  ],
+  "scripts": {
+    "dev": "bun app.js",
+    "build": "bundlerbus ./app.js --outfile ./dist/image-processor.exe",
+    "build:all": "npm run build:win && npm run build:mac && npm run build:linux",
+    "build:win": "bundlerbus ./app.js --target bun-windows-x64 --outfile ./dist/image-processor-win.exe",
+    "build:mac": "bundlerbus ./app.js --target bun-darwin-arm64 --outfile ./dist/image-processor-mac",
+    "build:linux": "bundlerbus ./app.js --target bun-linux-x64 --outfile ./dist/image-processor-linux"
+  },
+  "dependencies": {
+    "sharp": "^0.33.0"
+  },
+  "devDependencies": {},
+  "keywords": [
+    "bundlerbus",
+    "example",
+    "sharp",
+    "image-processing"
+  ],
+  "author": "Bundlerbus Example",
+  "license": "MIT"
+}

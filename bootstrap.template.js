@@ -1,5 +1,6 @@
+// bootstrap.template.js
 import { existsSync, mkdirSync, writeFileSync, readdirSync, readFileSync, createWriteStream, rmSync, chmodSync } from 'fs';
-import { join, dirname, extname, basename } from 'path';
+import { join, dirname, extname } from 'path';
 import { homedir } from 'os';
 import { createGunzip } from 'zlib';
 import { Readable } from 'stream';
@@ -9,19 +10,19 @@ import { createHash } from 'crypto';
 // The embedded archive
 import payloadArchive from './payload.tar.gz' with { type: 'file' };
 
-const EXE_NAME = 'app-test'; // basename(process.execPath, extname(process.execPath)); // Dynamic App Name based on the EXE filename, not now though!
-const VERSION = '1.0.0';
+const APP_NAME = '___BUNDLERBUS_APP_NAME___';
+const APP_VERSION = '___BUNDLERBUS_APP_VERSION___';
 
 function getCacheDir() {
     const platform = process.platform;
     if (platform === 'win32') {
-        return join(process.env.LOCALAPPDATA || join(homedir(), 'AppData', 'Local'), EXE_NAME, VERSION);
+        return join(process.env.LOCALAPPDATA || join(homedir(), 'AppData', 'Local'), APP_NAME, APP_VERSION);
     } else if (platform === 'darwin') {
-        return join(homedir(), 'Library', 'Application Support', EXE_NAME, VERSION);
+        return join(homedir(), 'Library', 'Application Support', APP_NAME, APP_VERSION);
     } else {
         // Linux / Unix (XDG Spec)
         const base = process.env.XDG_CACHE_HOME || join(homedir(), '.cache');
-        return join(base, EXE_NAME, VERSION);
+        return join(base, APP_NAME, APP_VERSION);
     }
 }
 
@@ -35,7 +36,7 @@ async function bootstrap() {
         const existingHash = existsSync(hashFile) ? readFileSync(hashFile, 'utf8') : null;
 
         if (currentHash !== existingHash) {
-            console.log(`[BOOTSTRAP] Unfolding environment...`);
+            console.log('[BOOTSTRAP] Unfolding environment...');
             if (existsSync(cacheDir)) rmSync(cacheDir, { recursive: true, force: true });
             mkdirSync(cacheDir, { recursive: true });
 
@@ -91,7 +92,7 @@ async function bootstrap() {
         // Inject native paths into the OS environment
         process.env[envVar] = Array.from(libPaths).join(sep) + sep + (process.env[envVar] || '');
 
-        const entryPoint = join(cacheDir, 'app.js');
+        const entryPoint = join(cacheDir, '___BUNDLERBUS_ENTRY___');
         await import(entryPoint);
 
     } catch (err) {
