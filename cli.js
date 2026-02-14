@@ -153,8 +153,8 @@ All flags after the entry point are forwarded to 'bun build --compile'
 
         console.log(`[INFO] Running: bun ${bunArgs.join(' ')}`);
 
-        const result = spawnSync('bun', bunArgs, { 
-            stdio: 'inherit', 
+        const result = spawnSync('bun', bunArgs, {
+            stdio: 'inherit',
             shell: process.platform === 'win32',
             windowsVerbatimArguments: process.platform === 'win32'
         });
