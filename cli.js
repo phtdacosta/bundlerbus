@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // cli.js
-import { execSync } from 'child_process';
+import { spawnSync } from 'child_process';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -143,10 +143,25 @@ All flags after the entry point are forwarded to 'bun build --compile'
 
         // Step 4: Build with Bun
         console.log('[INFO] Compiling with Bun...');
-        const bunCmd = ['bun', 'build', '--compile', './bootstrap.js', ...bunFlags].join(' ');
-        console.log(`[INFO] Running: ${bunCmd}`);
 
-        execSync(bunCmd, { stdio: 'inherit' });
+        const bunArgs = [
+            'build',
+            '--compile',
+            './bootstrap.js',
+            ...bunFlags
+        ];
+
+        console.log(`[INFO] Running: bun ${bunArgs.join(' ')}`);
+
+        const result = spawnSync('bun', bunArgs, { 
+            stdio: 'inherit', 
+            shell: process.platform === 'win32',
+            windowsVerbatimArguments: process.platform === 'win32'
+        });
+
+        if (result.status !== 0) {
+            throw new Error(`Bun build failed with exit code ${result.status}`);
+        }
 
         console.log('[SUCCESS] Build complete!');
 

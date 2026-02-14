@@ -2,9 +2,18 @@
 
 **Universal native bindings bundler for Bun's `--compile` flag**
 
-Bundlerbus solves the critical problem of compiling Bun projects that use native Node.js modules (like Sharp, Canvas, serialport, etc.) into single-file executables. Bun's built-in `--compile` flag fails when these libraries try to load `.node` bindings from the virtual filesystem.
+![npm version](https://img.shields.io/npm/v/bundlerbus.svg)
+![npm downloads (monthly)](https://img.shields.io/npm/dm/bundlerbus.svg)
+![npm downloads (total)](https://img.shields.io/npm/dt/bundlerbus.svg)
+![license](https://img.shields.io/npm/l/bundlerbus.svg)
+![GitHub stars](https://img.shields.io/github/stars/phtdacosta/bundlerbus?style=social)
+![GitHub forks](https://img.shields.io/github/forks/phtdacosta/bundlerbus)
+![GitHub issues](https://img.shields.io/github/issues/phtdacosta/bundlerbus)
+![GitHub last commit](https://img.shields.io/github/last-commit/phtdacosta/bundlerbus)
+![Repo size](https://img.shields.io/github/repo-size/phtdacosta/bundlerbus)
+![THYPRESS.ORG](https://img.shields.io/badge/THYPRESS.ORG-–?style=flat&color=%23333&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4MzgiIGhlaWdodD0iODM4Ij48cGF0aCBmaWxsPSIjRkZGIiBkPSJtMTU0LjM4NiAxMDkuODYgMi42MjUtLjAxYzIuOTE1LS4wMDggNS44My0uMDEgOC43NDUtLjAxMWw2LjI1OS0uMDE1YzUuNjgzLS4wMTMgMTEuMzY2LS4wMiAxNy4wNS0uMDI0IDMuNTYtLjAwMyA3LjExOS0uMDA3IDEwLjY3OS0uMDEyIDExLjE2MS0uMDEzIDIyLjMyMi0uMDIzIDMzLjQ4NC0uMDI3IDEyLjgzNC0uMDA0IDI1LjY2OS0uMDIyIDM4LjUwNC0uMDUgOS45NDQtLjAyMyAxOS44ODgtLjAzMyAyOS44MzMtLjAzNCA1LjkyNS0uMDAxIDExLjg1LS4wMDcgMTcuNzc1LS4wMjUgMzguNDEyLS4xMSA3NC40MzEgMS4xNjIgMTEwLjY2IDE1LjM0OGwyLjMyNy45MDFjMzQuNDk2IDEzLjYwNyA2MS4zMSA0MC4wOTUgNzYuMzYgNzMuODE4IDMuMzA2IDcuNzE1IDUuNTYzIDE1LjQ2NSA3LjQ1NCAyMy42MjVhMTAwLjA3NCAxMDAuMDc0IDAgMCAwIDEuODEyIDYuNzMyYzQuNDAyIDE1LjM1IDQuNTE2IDMyLjAyMSA0LjM4MyA0Ny44Ni0uMDI0IDMuMDI1LS4wMiA2LjA1LS4wMTQgOS4wNzQtLjAxNiAxMS4xNjItLjU3NSAyMS45NTgtMi4zMjIgMzIuOTlsLS4zNjUgMi40NzJjLTQuMTM0IDI2LjkzLTE1LjAxNyA1My42Ni0zMi42MzUgNzQuNTI4bC0yLjM2MyAyLjg2Yy0xNS42MzMgMTguMTE0LTM3LjU0NyAzMC45MjMtNTkuOTM0IDM4LjgzMWExNzcuNDggMTc3LjQ4IDAgMCAwLTYuNTk0IDIuNDYxYy02LjU0IDIuNTk1LTEzLjE0IDMuOTM1LTIwLjA0MyA1LjEyNS0zLjg0Mi42NjQtNy42MzcgMS40OTEtMTEuNDQxIDIuMzQ4LTcuMTM3IDEuNTQ3LTEzLjk5IDIuMzk0LTIxLjI4NiAyLjM4MmwtMi40Ni0uMDAzTDM2MSA0NTFsLjAwMyAxLjc0MmE5Njc5MC4yMjkgOTY3OTAuMjI5IDAgMCAxIC4xNjIgMTE0LjUxMmwuMDAyIDIuNDY4Yy4wMTMgMTMuMTkuMDM3IDI2LjM4LjA2NCAzOS41Ny4wMjkgMTMuNTM1LjA0NSAyNy4wNy4wNTEgNDAuNjAzLjAwNCA4LjM1Mi4wMTcgMTYuNzAzLjA0MiAyNS4wNTUuMDE2IDUuNzI2LjAyIDExLjQ1My4wMTcgMTcuMTgtLjAwMiAzLjMwNC4wMDIgNi42MDguMDE3IDkuOTEyLjAxNSAzLjU4NC4wMTEgNy4xNjguMDAzIDEwLjc1MmwuMDI2IDMuMTU3Yy0uMDUgOC4wMDUtMS41MjIgMTQuMTg0LTcuMzg3IDIwLjA0OS02Ljc1IDQuMjEyLTEyLjg3IDUuMTUtMjAuNzYgNS4xMzRsLTIuMzQ4LjAwN2MtMi41OTEuMDA2LTUuMTgzLjAwNS03Ljc3NC4wMDRsLTUuNTc5LjAxYy01LjA1LjAxLTEwLjEuMDEyLTE1LjE0OS4wMTItMy4xNTYuMDAxLTYuMzEyLjAwMy05LjQ2Ny4wMDYtMTEuMDEzLjAwOS0yMi4wMjUuMDEzLTMzLjAzOC4wMTItMTAuMjYgMC0yMC41Mi4wMS0zMC43OC4wMjYtOC44MTQuMDEzLTE3LjYyNi4wMTgtMjYuNDQuMDE4LTUuMjYxIDAtMTAuNTIzLjAwMi0xNS43ODUuMDEzLTQuOTUuMDEtOS45LjAxLTE0Ljg1LjAwMy0xLjgxNC0uMDAyLTMuNjI4IDAtNS40NDIuMDA3LTIuNDgyLjAwOC00Ljk2NC4wMDMtNy40NDYtLjAwNWwtMi4xNi4wMTZjLTYuNDI1LS4wNDQtMTIuOTQyLS45MjUtMTguMjMyLTQuODI2bC0xLjg5LTEuMzE2Yy01LjUyNi02LjMwMy02LjQ0NS0xMy40NS02LjM2Ni0yMS41NGwtLjAxOS0zLjA4MmMtLjAxNS0zLjQwNS0uMDAyLTYuODEuMDEtMTAuMjE2LS4wMDUtMi40NjgtLjAxMi00LjkzNS0uMDItNy40MDItLjAxNS01LjM2My0uMDE4LTEwLjcyNy0uMDEtMTYuMDkuMDE0LTcuOTc1LjAwNC0xNS45NS0uMDEtMjMuOTI2LS4wMjYtMTQuMjQ1LS4wMjctMjguNDktLjAyLTQyLjczNWEzMzE0Ny4xODcgMzMxNDcuMTg3IDAgMCAwLS4wMDItNDIuNDE2bC0uMDA0LTcuNTZhNjY5MDguNzI5IDY2OTA4LjcyOSAwIDAgMSAuMDA2LTk0LjQ3NGMuMDE1LTI3Ljk3Ni4wMDYtNTUuOTUxLS4wMjItODMuOTI3YTcxMjA4LjQ3OCA3MTIwOC40NzggMCAwIDEtLjAzMy0xMDQuMzV2LTIuNWMuMDA0LTEyLjQ1OC0uMDA1LTI0LjkxNi0uMDItMzcuMzc0LS4wMTktMTQuMTY2LS4wMTktMjguMzMzLjAwNC00Mi41LjAxMy03LjkyNy4wMTItMTUuODU0LS4wMS0yMy43ODItLjAxNC01LjkxOC0uMDAyLTExLjgzNy4wMi0xNy43NTYuMDA1LTIuMzk0LjAwMi00Ljc5LS4wMTEtNy4xODQtLjAxNi0zLjI1NS0uMDAyLTYuNTA4LjAyLTkuNzYybC0uMDM2LTIuODJjLjA5NS02Ljc2NyAxLjg2NS0xMi4wODggNS42NjMtMTcuNzI1IDUuNjItNS4zNzkgMTAuOTAzLTYuMTQ4IDE4LjM4Ni02LjE0WiIvPjwvc3ZnPg==)
 
-The only exception is better-sqlite3 that still didn't work.
+Bundlerbus solves the critical problem of compiling Bun projects that use native Node.js modules (tested with Sharp, Canvas, serialport) into single-file executables. Bun's built-in `--compile` flag fails when these libraries try to load `.node` bindings from the virtual filesystem.
 
 ## The Problem
 
@@ -219,13 +228,13 @@ const configs = {
       '--windows-publisher="THYPRESS™"',
       `--windows-version="${pkg.version}"`,
       '--target=bun-windows-x64',
-      '--outfile=./dist/THYPRESS-BINDER.exe'
+      '--outfile=./dist/THYPRESS-LAUNCHER.exe'
     ]
   },
   darwin: {
     flags: [
       '--target=bun-darwin-arm64',
-      '--outfile=./dist/thypress-binder-mac'
+      '--outfile=./dist/thypress-launcher-mac'
     ]
   }
 };
@@ -280,6 +289,27 @@ Or add to `package.json`:
 ```json
 {
   "bin": "./src/cli.js"
+}
+```
+
+## Known Quirks & Tips
+
+| Detection | Bun Version | Quirk | Fix |
+| :--- | :--- | :--- | :--- |
+| 2025-01-30 | ~v1.3.3 | **The "Ghost Drive" Crash:** `process.chdir()` can throw `ENOENT` in compiled EXEs if the path resolves to a virtual drive (like `B:` or `Z:`) that doesn't exist on the physical machine. | Use a "Smart Switch" check: `if (process.cwd() !== targetPath) process.chdir(targetPath);` |
+
+**The "Ghost Drive" Explained:**
+When Bun compiles an EXE, it creates a virtual filesystem inside the binary. If your code calls `process.chdir()`, Bun intercepts this call. If the path looks like an internal Bun path (often caused by how `__dirname` or relative paths resolve during compilation), it may try to tell Windows to move the process to a virtual drive letter (the "Ghost Drive"). Windows doesn't recognize this as a physical drive and crashes the app with an `ENOENT` error.
+
+**The Fix:**
+Always check if you are already in the target directory before calling `chdir()`. This prevents the unnecessary system call that wakes up the Bun interceptor and triggers the "Ghost Drive" logic.
+
+```javascript
+import path from 'node:path';
+
+const target = path.resolve(destination);
+if (process.cwd() !== target) {
+  process.chdir(target);
 }
 ```
 
@@ -341,6 +371,13 @@ These tradeoffs are acceptable for the **100% reliability** with native bindings
 - [ ] Delta updates (only re-extract changed files)
 - [ ] `bundlerbus clean` command to purge old caches
 - [ ] Compression options (brotli, zstd)
+
+## Related Projects & Ecosystem
+
+Bundlerbus was originally developed to enhance [**THYPRESS.org**](https://thypress.org) — a zero-config static site generator that instantly turns a folder of Markdown notes into a production-ready website — that needed a reliable native binding bundling.
+-  **THYPRESS Launcher** — https://github.com/thypress/launcher
+- (If you’re using Bundlerbus in your own project and would like it featured here as an example of how it’s used in the wild, feel free to open a PR or drop a link! 🚍✨)
+
 
 ## License
 

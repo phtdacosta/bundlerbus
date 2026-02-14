@@ -1,13 +1,12 @@
-// bootstrap.template.js
-import { existsSync, mkdirSync, writeFileSync, readdirSync, readFileSync, createWriteStream, rmSync, chmodSync } from 'fs';
-import { join, dirname, extname } from 'path';
+// bootstrap.template.js (DEBUG VERSION)
+import { existsSync, mkdirSync, writeFileSync, readFileSync, createWriteStream, rmSync, chmodSync } from 'fs';
+import { join, dirname, isAbsolute } from 'path';
 import { homedir } from 'os';
 import { createGunzip } from 'zlib';
 import { Readable } from 'stream';
 import tar from 'tar-stream';
 import { createHash } from 'crypto';
 
-// The embedded archive
 import payloadArchive from './payload.tar.gz' with { type: 'file' };
 
 const APP_NAME = '___BUNDLERBUS_APP_NAME___';
@@ -20,7 +19,6 @@ function getCacheDir() {
     } else if (platform === 'darwin') {
         return join(homedir(), 'Library', 'Application Support', APP_NAME, APP_VERSION);
     } else {
-        // Linux / Unix (XDG Spec)
         const base = process.env.XDG_CACHE_HOME || join(homedir(), '.cache');
         return join(base, APP_NAME, APP_VERSION);
     }
@@ -29,71 +27,114 @@ function getCacheDir() {
 async function bootstrap() {
     try {
         const cacheDir = getCacheDir();
-        const payloadBuffer = readFileSync(payloadArchive);
-
-        const currentHash = createHash('md5').update(payloadBuffer).digest('hex');
+        const flagFile = join(cacheDir, '.done');
         const hashFile = join(cacheDir, '.hash');
-        const existingHash = existsSync(hashFile) ? readFileSync(hashFile, 'utf8') : null;
 
-        if (currentHash !== existingHash) {
+        let needsExtraction = !existsSync(flagFile);
+        
+        if (!needsExtraction) {
+            const payloadBuffer = readFileSync(payloadArchive);
+            const currentHash = createHash('sha256').update(payloadBuffer).digest('hex');
+            const storedHash = existsSync(hashFile) ? readFileSync(hashFile, 'utf8').trim() : null;
+            
+            if (currentHash !== storedHash) {
+                console.log('[BOOTSTRAP] Cache hash mismatch, re-extracting...');
+                needsExtraction = true;
+            }
+        }
+
+        if (needsExtraction) {
             console.log('[BOOTSTRAP] Unfolding environment...');
+            
             if (existsSync(cacheDir)) rmSync(cacheDir, { recursive: true, force: true });
             mkdirSync(cacheDir, { recursive: true });
 
+            const payloadBuffer = readFileSync(payloadArchive);
+            const currentHash = createHash('sha256').update(payloadBuffer).digest('hex');
+
+            const extract = tar.extract();
+            extract.on('entry', (header, stream, next) => {
+                const fullPath = join(cacheDir, header.name);
+                
+                if (header.type === 'directory') {
+                    mkdirSync(fullPath, { recursive: true });
+                    stream.resume();
+                    next();
+                } else {
+                    mkdirSync(dirname(fullPath), { recursive: true });
+                    stream.pipe(createWriteStream(fullPath)).on('finish', () => {
+                        if (header.mode && process.platform !== 'win32') {
+                            try {
+                                chmodSync(fullPath, header.mode);
+                            } catch (err) {}
+                        }
+                        next();
+                    });
+                }
+            });
+
             await new Promise((resolve, reject) => {
-                const extract = tar.extract();
-                extract.on('entry', (header, stream, next) => {
-                    const outPath = join(cacheDir, header.name);
-                    if (header.type === 'directory') {
-                        mkdirSync(outPath, { recursive: true });
-                        stream.resume(); next();
-                    } else {
-                        mkdirSync(dirname(outPath), { recursive: true });
-                        const outStream = createWriteStream(outPath);
-                        stream.pipe(outStream);
-                        outStream.on('finish', () => {
-                            // On Unix, ensure binaries are executable
-                            if (process.platform !== 'win32') {
-                                const isBin = outPath.endsWith('.node') || outPath.endsWith('.so') ||
-                                              outPath.endsWith('.dylib') || outPath.includes('bin/');
-                                if (isBin) chmodSync(outPath, 0o755);
-                            }
-                            next();
-                        });
-                        outStream.on('error', reject);
-                    }
-                });
                 extract.on('finish', resolve);
+                extract.on('error', reject);
                 Readable.from(payloadBuffer).pipe(createGunzip()).pipe(extract);
             });
+
             writeFileSync(hashFile, currentHash);
+            writeFileSync(flagFile, 'true');
         }
 
-        // --- NATIVE SEARCH PATH INJECTION ---
-        const nodeModules = join(cacheDir, 'node_modules');
-        const libPaths = new Set();
-        const scan = (dir) => {
-            if (!existsSync(dir)) return;
-            const entries = readdirSync(dir, { withFileTypes: true });
-            for (const e of entries) {
-                const p = join(dir, e.name);
-                if (e.isDirectory()) scan(p);
-                else if (['.dll', '.so', '.node', '.dylib'].includes(extname(e.name).toLowerCase())) {
-                    libPaths.add(dir);
-                }
+        // ========================================================================
+        // DEBUG: Show what we're working with
+        // ========================================================================
+        const userArgs = process.argv.slice(2);
+        console.log('[BOOTSTRAP DEBUG] Raw argv:', process.argv);
+        console.log('[BOOTSTRAP DEBUG] User args:', userArgs);
+        console.log('[BOOTSTRAP DEBUG] Current cwd BEFORE any chdir:', process.cwd());
+
+        // ========================================================================
+        // CONDITIONAL WORKING DIRECTORY LOGIC
+        // ========================================================================
+        const hasPathArguments = userArgs.some(arg => {
+            if (arg.startsWith('-')) return false;
+            
+            const commands = ['serve', 'build', 'dev', 'start', 'test', 'help', 'version', 's', 'b', 'd', 'h', 'v'];
+            if (commands.includes(arg.toLowerCase())) return false;
+            
+            const isPath = (
+                arg.includes('/') ||
+                arg.includes('\\') ||
+                isAbsolute(arg) ||
+                existsSync(arg)
+            );
+            
+            if (isPath) {
+                console.log(`[BOOTSTRAP DEBUG] Detected path argument: "${arg}"`);
             }
-        };
-        scan(nodeModules);
+            
+            return isPath;
+        });
 
-        const platform = process.platform;
-        const envVar = platform === 'win32' ? 'PATH' : (platform === 'darwin' ? 'DYLD_LIBRARY_PATH' : 'LD_LIBRARY_PATH');
-        const sep = platform === 'win32' ? ';' : ':';
+        console.log('[BOOTSTRAP DEBUG] hasPathArguments:', hasPathArguments);
 
-        // Inject native paths into the OS environment
-        process.env[envVar] = Array.from(libPaths).join(sep) + sep + (process.env[envVar] || '');
+        if (!hasPathArguments) {
+            const exeFolder = dirname(process.argv[0]);
+            console.log('[BOOTSTRAP DEBUG] No path args detected, changing to exe folder:', exeFolder);
+            process.chdir(exeFolder);
+        } else {
+            console.log('[BOOTSTRAP DEBUG] Path arguments detected, NOT changing directory');
+        }
+
+        console.log('[BOOTSTRAP DEBUG] Final cwd:', process.cwd());
+
+        process.env.NODE_PATH = join(cacheDir, 'node_modules');
 
         const entryPoint = join(cacheDir, '___BUNDLERBUS_ENTRY___');
-        await import(entryPoint);
+        
+        process.argv = [process.argv[0], entryPoint, ...userArgs];
+        console.log('[BOOTSTRAP DEBUG] Reconstructed argv:', process.argv);
+
+        const importPath = `file:///${entryPoint.replace(/\\/g, '/')}`;
+        await import(importPath);
 
     } catch (err) {
         console.error('[BOOTSTRAP] Fatal Error:', err);
